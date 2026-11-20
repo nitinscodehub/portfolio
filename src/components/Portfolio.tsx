@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { ArrowDown, ArrowUpRight, Check, Code2, Copy, Layers, Sparkles, Zap } from "lucide-react";
+import { ArrowDown, ArrowUpRight, Check, Code2, Copy, ExternalLink, Layers, Sparkles, Zap } from "lucide-react";
 import ProjectModal from "./ProjectModal";
 import { projects, type Project } from "@/lib/projects";
 import { site } from "@/lib/site";
@@ -208,6 +208,15 @@ export default function Portfolio() {
                     >
                       Case study <ArrowUpRight className="size-3.5" />
                     </button>
+                    <a
+                      href={project.live}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`${project.name} live demo`}
+                      className="flex items-center justify-center rounded-lg border border-line px-3.5 text-muted hover:text-brand"
+                    >
+                      <ExternalLink className="size-4" />
+                    </a>
                     <a
                       href={project.repo}
                       target="_blank"

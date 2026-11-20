@@ -7,6 +7,8 @@
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8?style=flat-square)
 ![Portfolio](https://img.shields.io/badge/Portfolio-4%20projects-7c3aed?style=flat-square)
 
+**🚀 Live demo:** [portfolio-tawny-one-91.vercel.app](https://portfolio-tawny-one-91.vercel.app)
+
 ---
 
 ## ✨ What it does
@@ -49,12 +51,12 @@ Edit [`src/lib/site.ts`](src/lib/site.ts) to replace the placeholder Contra URL 
 
 ## 📁 Projects featured
 
-| Project | Description | Repo |
-|---|---|---|
-| Pulse | AI-powered SaaS analytics dashboard | [pulse-analytics](https://github.com/nitinscodehub/pulse-analytics) |
-| Askly | RAG knowledge assistant with streaming cited answers | [askly](https://github.com/nitinscodehub/askly) |
-| Cartly | Headless e-commerce storefront with demo checkout | [cartly](https://github.com/nitinscodehub/cartly) |
-| Flowbit | Visual AI workflow automation builder | [flowbit](https://github.com/nitinscodehub/flowbit) |
+| Project | Description | Live demo | Repo |
+|---|---|---|---|
+| Pulse | AI-powered SaaS analytics dashboard | [Live](https://pulse-analytics-three.vercel.app) | [pulse-analytics](https://github.com/nitinscodehub/pulse-analytics) |
+| Askly | RAG knowledge assistant with streaming cited answers | [Live](https://askly-kappa.vercel.app) | [askly](https://github.com/nitinscodehub/askly) |
+| Cartly | Headless e-commerce storefront with demo checkout | [Live](https://cartly-self.vercel.app) | [cartly](https://github.com/nitinscodehub/cartly) |
+| Flowbit | Visual AI workflow automation builder | [Live](https://flowbit-silk.vercel.app) | [flowbit](https://github.com/nitinscodehub/flowbit) |
 
 Project content lives in [`src/lib/projects.ts`](src/lib/projects.ts) — add a fifth project by appending one object.
 

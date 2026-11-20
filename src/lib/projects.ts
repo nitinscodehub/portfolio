@@ -6,6 +6,7 @@ export type Project = {
   summary: string;
   cover: string;
   repo: string;
+  live: string;
   accent: string;
   stack: string[];
   highlights: string[];
@@ -25,6 +26,7 @@ export const projects: Project[] = [
       "Revenue, traffic and transaction metrics in one polished dashboard, with AI-generated insights that adapt to the selected time range.",
     cover: "/pulse-cover.png",
     repo: "https://github.com/nitinscodehub/pulse-analytics",
+    live: "https://pulse-analytics-three.vercel.app",
     accent: "from-cyan-400 to-blue-500",
     stack: ["Next.js 15", "TypeScript", "Tailwind", "Recharts", "Neon AI Gateway"],
     highlights: [
@@ -54,6 +56,7 @@ export const projects: Project[] = [
       "A retrieval-augmented assistant that ingests documents, embeds and chunks them, then streams grounded answers with clickable source chips.",
     cover: "/askly-cover.png",
     repo: "https://github.com/nitinscodehub/askly",
+    live: "https://askly-kappa.vercel.app",
     accent: "from-violet-400 to-fuchsia-500",
     stack: ["Next.js 15", "TypeScript", "RAG", "SSE", "Neon AI Gateway"],
     highlights: [
@@ -83,6 +86,7 @@ export const projects: Project[] = [
       "Headless commerce experience with search, filters, a smart cart, discount codes, free-shipping rules and a complete demo checkout.",
     cover: "/cartly-cover.png",
     repo: "https://github.com/nitinscodehub/cartly",
+    live: "https://cartly-self.vercel.app",
     accent: "from-emerald-400 to-teal-500",
     stack: ["Next.js 15", "TypeScript", "Tailwind", "REST APIs", "next/image"],
     highlights: [
@@ -112,6 +116,7 @@ export const projects: Project[] = [
       "A visual workflow builder with draggable nodes, branching connections, configuration inspectors and animated step-by-step run logs.",
     cover: "/flowbit-cover.png",
     repo: "https://github.com/nitinscodehub/flowbit",
+    live: "https://flowbit-silk.vercel.app",
     accent: "from-amber-400 to-orange-500",
     stack: ["Next.js 15", "TypeScript", "Pointer Events", "SVG", "Neon AI Gateway"],
     highlights: [

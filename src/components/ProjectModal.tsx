@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Check, Code2, X } from "lucide-react";
+import { ArrowUpRight, Check, Code2, ExternalLink, X } from "lucide-react";
 import Image from "next/image";
 import type { Project } from "@/lib/projects";
 
@@ -41,14 +41,24 @@ export default function ProjectModal({
               <h2 className="mt-1 text-3xl font-bold text-ink">{project.name}</h2>
               <p className="mt-1 text-sm text-muted">{project.tagline}</p>
             </div>
-            <a
-              href={project.repo}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-xs font-semibold text-canvas hover:opacity-85"
-            >
-              <Code2 className="size-4" /> View code <ArrowUpRight className="size-3.5" />
-            </a>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={project.live}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-semibold text-canvas hover:bg-brand/85"
+              >
+                <ExternalLink className="size-4" /> Live demo <ArrowUpRight className="size-3.5" />
+              </a>
+              <a
+                href={project.repo}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 rounded-xl border border-line px-4 py-2.5 text-xs text-ink hover:border-brand/50"
+              >
+                <Code2 className="size-4" /> View code <ArrowUpRight className="size-3.5" />
+              </a>
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
