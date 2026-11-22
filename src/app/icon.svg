@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#07090f"/>
+  <path d="M8 14h48" stroke="#00d9ff" stroke-width="2" opacity=".8"/>
+  <text x="32" y="42" text-anchor="middle" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#f4f7fb">ND</text>
+  <circle cx="32" cy="52" r="2" fill="#e8b95b"/>
+</svg>
