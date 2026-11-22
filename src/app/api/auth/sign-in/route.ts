@@ -1,13 +1,14 @@
+import { NextResponse } from "next/server";
 import { apiError, clientIp, noStoreHeaders } from "@/lib/http";
+import { attachSessionCookie, passwordMatches } from "@/lib/resume/auth";
+import { adminPasswordConfigured } from "@/lib/resume/config";
 import { allowRequest } from "@/lib/resume/rate-limit";
-import { SIGN_IN_SCHEMA } from "@/lib/resume/validation";
-import { supabaseAuthConfigured } from "@/lib/supabase/config";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { signInSchema } from "@/lib/resume/validation";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
-  if (!supabaseAuthConfigured) {
+  if (!adminPasswordConfigured) {
     return apiError(503, "auth_not_configured", "Authentication is not configured.");
   }
   if (!(await allowRequest(`signin:${clientIp(request)}`, 8, 900))) {
@@ -21,19 +22,17 @@ export async function POST(request: Request) {
     return apiError(400, "invalid_json", "Expected a JSON body.");
   }
 
-  const parsed = SIGN_IN_SCHEMA.safeParse(body);
-  if (!parsed.success) return apiError(400, "invalid_input", "Enter a valid email and password.");
+  const parsed = signInSchema.safeParse(body);
+  if (!parsed.success) return apiError(400, "invalid_input", "Enter the admin password.");
 
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return apiError(503, "auth_not_configured", "Authentication is not configured.");
-
-  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error || !data.user) {
-    return apiError(401, "invalid_credentials", "Email or password is incorrect.");
+  if (!passwordMatches(parsed.data.password)) {
+    return apiError(401, "invalid_credentials", "The password is incorrect.");
   }
 
-  return Response.json(
-    { user: { id: data.user.id, email: data.user.email ?? null } },
-    { headers: noStoreHeaders() },
+  return attachSessionCookie(
+    NextResponse.json(
+      { user: { id: "site-owner", email: "owner@portfolio.local" } },
+      { headers: noStoreHeaders() },
+    ),
   );
 }

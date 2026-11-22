@@ -13,7 +13,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     return apiError(400, "invalid_id", "Invalid version ID.");
   }
 
-  const result = await deleteResumeVersion(id, guard.user.id);
+  const result = await deleteResumeVersion(id);
   if (!result.ok) return apiError(result.status, "delete_failed", result.message);
   return Response.json({ ok: true });
 }

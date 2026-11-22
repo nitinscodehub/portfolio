@@ -1,12 +1,12 @@
 import { noStoreHeaders } from "@/lib/http";
-import { getAuthContext } from "@/lib/supabase/auth";
+import { isAdmin } from "@/lib/resume/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const auth = await getAuthContext();
+  const admin = await isAdmin();
   return Response.json(
-    { status: auth.status, email: auth.user?.email ?? null },
+    { status: admin ? "authorized" : "unauthenticated", email: admin ? "owner@portfolio.local" : null },
     { headers: noStoreHeaders() },
   );
 }

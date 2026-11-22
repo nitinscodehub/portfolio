@@ -1,72 +1,89 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { createSupabaseAdminClient } from "@/lib/supabase/server";
-import { RESUME_BUCKET } from "@/lib/supabase/config";
+import { del, put } from "@vercel/blob";
+import { blobPublicBaseUrl, MANIFEST_PATH, STORAGE_PATH, storageConfigured } from "./config";
+import type { AuditEntry, ResumeManifest, ResumeVersion } from "./types";
 import { PdfValidationError, safeFileName, validatePdf } from "./validation";
 
-export type ResumeVersion = {
-  id: string;
-  storage_key: string;
-  original_filename: string;
-  file_size: number;
-  mime_type: string;
-  version: number;
-  is_active: boolean;
-  checksum: string | null;
-  uploaded_by: string | null;
-  uploaded_at: string;
-};
+export type { ResumeVersion } from "./types";
 
-const columns = "id, storage_key, original_filename, file_size, mime_type, version, is_active, checksum, uploaded_by, uploaded_at";
+const ACTOR = "site-owner";
+
+function emptyManifest(): ResumeManifest {
+  return { activeId: null, versions: [], audit: [] };
+}
+
+/**
+ * Reads the manifest directly from its deterministic public URL. We add a fresh
+ * cache-buster on every read so a publish is visible immediately, without waiting
+ * for the Blob list API or the edge cache to catch up.
+ */
+async function readManifest(): Promise<ResumeManifest> {
+  if (!storageConfigured || !blobPublicBaseUrl) return emptyManifest();
+  try {
+    const nonce = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const url = `${blobPublicBaseUrl}/${MANIFEST_PATH}?v=${nonce}`;
+    const response = await fetch(url, { cache: "no-store" });
+    if (response.status === 404) return emptyManifest();
+    if (!response.ok) throw new Error(`Manifest fetch returned ${response.status}`);
+
+    const raw = (await response.json()) as Partial<ResumeManifest>;
+    if (!raw || !Array.isArray(raw.versions)) return emptyManifest();
+    return {
+      activeId: typeof raw.activeId === "string" ? raw.activeId : null,
+      versions: raw.versions,
+      audit: Array.isArray(raw.audit) ? raw.audit : [],
+    };
+  } catch (error) {
+    console.error("Failed to read resume manifest:", error);
+    return emptyManifest();
+  }
+}
+
+async function writeManifest(manifest: ResumeManifest) {
+  await put(MANIFEST_PATH, JSON.stringify(manifest), {
+    access: "public",
+    contentType: "application/json",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    cacheControlMaxAge: 60,
+  });
+}
+
+function withActiveFlag(manifest: ResumeManifest): ResumeVersion[] {
+  return [...manifest.versions]
+    .map((version) => ({ ...version, is_active: version.id === manifest.activeId }))
+    .sort((a, b) => b.version - a.version);
+}
+
+function audit(action: AuditEntry["action"], version: string): AuditEntry {
+  return { action, version, actor: ACTOR, at: new Date().toISOString() };
+}
 
 export async function getActiveResume(): Promise<ResumeVersion | null> {
-  const admin = createSupabaseAdminClient();
-  if (!admin) return null;
-
-  const { data, error } = await admin
-    .from("resume_versions")
-    .select(columns)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Failed to read active resume:", error.message);
-    return null;
-  }
-  return (data as ResumeVersion | null) ?? null;
+  const manifest = await readManifest();
+  if (!manifest.activeId) return null;
+  return withActiveFlag(manifest).find((version) => version.id === manifest.activeId) ?? null;
 }
 
 export async function listResumeVersions(): Promise<ResumeVersion[]> {
-  const admin = createSupabaseAdminClient();
-  if (!admin) return [];
-
-  const { data, error } = await admin
-    .from("resume_versions")
-    .select(columns)
-    .order("version", { ascending: false })
-    .limit(100);
-
-  if (error) {
-    console.error("Failed to list resume versions:", error.message);
-    return [];
-  }
-  return (data as ResumeVersion[]) ?? [];
+  return withActiveFlag(await readManifest());
 }
 
 export async function getResumeVersion(id: string): Promise<ResumeVersion | null> {
-  const admin = createSupabaseAdminClient();
-  if (!admin) return null;
-  const { data, error } = await admin.from("resume_versions").select(columns).eq("id", id).maybeSingle();
-  if (error || !data) return null;
-  return data as ResumeVersion;
+  const manifest = await readManifest();
+  return withActiveFlag(manifest).find((version) => version.id === id) ?? null;
 }
 
-export type UploadResult = { ok: true; version: ResumeVersion } | { ok: false; status: number; message: string };
+export type UploadResult =
+  | { ok: true; version: ResumeVersion }
+  | { ok: false; status: number; message: string };
 
-export async function uploadResumePdf(file: File, actorId: string): Promise<UploadResult> {
-  const admin = createSupabaseAdminClient();
-  if (!admin) return { ok: false, status: 503, message: "Resume storage is not configured." };
+export async function uploadResumePdf(file: File): Promise<UploadResult> {
+  if (!storageConfigured) {
+    return { ok: false, status: 503, message: "Resume storage is not configured." };
+  }
 
   let validated: File;
   try {
@@ -81,94 +98,97 @@ export async function uploadResumePdf(file: File, actorId: string): Promise<Uplo
 
   const buffer = Buffer.from(await validated.arrayBuffer());
   const checksum = createHash("sha256").update(buffer).digest("hex");
-  const storageKey = `resumes/${randomUUID()}.pdf`;
-  const originalFilename = safeFileName(validated.name);
+  const id = randomUUID();
+  const path = `${STORAGE_PATH}/${id}.pdf`;
 
-  const { error: uploadError } = await admin.storage.from(RESUME_BUCKET).upload(storageKey, buffer, {
-    contentType: "application/pdf",
-    cacheControl: "3600",
-    upsert: false,
-  });
-
-  if (uploadError) {
-    console.error("Resume upload failed:", uploadError.message);
+  let blob;
+  try {
+    blob = await put(path, buffer, {
+      access: "public",
+      contentType: "application/pdf",
+      addRandomSuffix: false,
+      cacheControlMaxAge: 31536000,
+    });
+  } catch (error) {
+    console.error("Resume upload failed:", error);
     return { ok: false, status: 502, message: "Storage upload failed. No version was created." };
   }
 
-  const { data, error: insertError } = await admin.rpc("create_resume_version", {
-    p_storage_key: storageKey,
-    p_original_filename: originalFilename,
-    p_file_size: buffer.byteLength,
-    p_checksum: checksum,
-    p_uploaded_by: actorId,
-  });
+  const manifest = await readManifest();
+  const version: ResumeVersion = {
+    id,
+    version: manifest.versions.reduce((max, item) => Math.max(max, item.version), 0) + 1,
+    original_filename: safeFileName(validated.name),
+    file_size: buffer.byteLength,
+    mime_type: "application/pdf",
+    is_active: false,
+    checksum,
+    uploaded_by: ACTOR,
+    uploaded_at: new Date().toISOString(),
+    url: blob.url,
+    downloadUrl: blob.downloadUrl,
+  };
 
-  if (insertError || !data) {
-    await admin.storage.from(RESUME_BUCKET).remove([storageKey]);
-    console.error("Resume version record failed:", insertError?.message ?? "no row returned");
-    return { ok: false, status: 502, message: "Could not create the resume version. Upload rolled back." };
+  manifest.versions.push(version);
+  manifest.audit.push(audit("upload", version.id));
+
+  try {
+    await writeManifest(manifest);
+  } catch (error) {
+    await del(blob.url).catch(() => undefined);
+    console.error("Resume manifest update failed:", error);
+    return { ok: false, status: 502, message: "Could not record the version. Upload rolled back." };
   }
 
-  return { ok: true, version: data as ResumeVersion };
+  return { ok: true, version };
 }
 
-export async function publishResumeVersion(id: string, actorId: string, action: "publish" | "restore") {
-  const admin = createSupabaseAdminClient();
-  if (!admin) return { ok: false as const, status: 503, message: "Resume storage is not configured." };
+export async function setActiveResumeVersion(id: string, action: "publish" | "restore") {
+  if (!storageConfigured) return { ok: false as const, status: 503, message: "Resume storage is not configured." };
 
-  const { data, error } = await admin.rpc("publish_resume_version", {
-    p_id: id,
-    p_actor: actorId,
-    p_action: action,
-  });
+  const manifest = await readManifest();
+  if (!manifest.versions.some((version) => version.id === id)) {
+    return { ok: false as const, status: 404, message: "That version no longer exists." };
+  }
 
-  if (error || data !== true) {
-    return {
-      ok: false as const,
-      status: error?.message?.includes("NOT_FOUND") ? 404 : 502,
-      message: error?.message ?? "Could not publish this version.",
-    };
+  manifest.activeId = id;
+  manifest.audit.push(audit(action, id));
+
+  try {
+    await writeManifest(manifest);
+  } catch (error) {
+    console.error("Resume publish failed:", error);
+    return { ok: false as const, status: 502, message: "Could not publish this version." };
   }
   return { ok: true as const };
 }
 
-export async function deleteResumeVersion(id: string, actorId: string) {
-  const admin = createSupabaseAdminClient();
-  if (!admin) return { ok: false as const, status: 503, message: "Resume storage is not configured." };
+export async function deleteResumeVersion(id: string) {
+  if (!storageConfigured) return { ok: false as const, status: 503, message: "Resume storage is not configured." };
 
-  const { data, error } = await admin.rpc("delete_resume_version", { p_id: id, p_actor: actorId });
-  if (error) {
-    const message = error.message ?? "Could not delete this version.";
-    const status = message.includes("ACTIVE_VERSION") ? 409 : message.includes("NOT_FOUND") ? 404 : 502;
-    return { ok: false as const, status, message };
+  const manifest = await readManifest();
+  if (manifest.activeId === id) {
+    return { ok: false as const, status: 409, message: "The active version cannot be deleted." };
   }
+  const target = manifest.versions.find((version) => version.id === id);
+  if (!target) return { ok: false as const, status: 404, message: "That version no longer exists." };
 
-  const storageKey = typeof data === "string" ? data : "";
-  if (storageKey) {
-    const { error: removeError } = await admin.storage.from(RESUME_BUCKET).remove([storageKey]);
-    if (removeError) console.error("Orphaned resume file after delete:", removeError.message);
-  }
+  manifest.versions = manifest.versions.filter((version) => version.id !== id);
+  manifest.audit.push(audit("delete", id));
+  await writeManifest(manifest);
+  await del(target.url).catch((error) => console.error("Orphaned resume file after delete:", error));
   return { ok: true as const };
 }
 
-export async function downloadActiveResume() {
+export async function getActiveDownload() {
   const active = await getActiveResume();
-  const admin = createSupabaseAdminClient();
-  if (!active || !admin) return null;
-
-  const { data, error } = await admin.storage.from(RESUME_BUCKET).download(active.storage_key);
-  if (error || !data) {
-    console.error("Resume download failed:", error?.message ?? "no data");
-    return null;
-  }
-
-  const blob = data as Blob;
-  const bytes = Buffer.from(await blob.arrayBuffer());
+  if (!active) return null;
   return {
-    bytes,
+    url: active.url,
+    downloadUrl: active.downloadUrl,
     filename: active.original_filename,
     version: active.version,
     updatedAt: active.uploaded_at,
-    size: bytes.byteLength,
+    size: active.file_size,
   };
 }

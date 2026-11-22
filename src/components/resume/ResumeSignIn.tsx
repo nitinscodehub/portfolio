@@ -1,70 +1,80 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
-import { KeyRound, Loader2 } from "lucide-react";
-import { apiFetchError } from "@/lib/client-api";
+import { KeyRound, Loader2, LockKeyhole } from "lucide-react";
 import MagneticButton from "@/components/ui/MagneticButton";
+import { apiFetchError } from "@/lib/client-api";
 
 export default function ResumeSignIn() {
-  const router = useRouter();
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setLoading(true);
+    setBusy(true);
     setError(null);
     try {
       const response = await fetch("/api/auth/sign-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ password }),
       });
       if (!response.ok) {
         setError(await apiFetchError(response, "Sign-in failed."));
         return;
       }
-      router.refresh();
+      setPassword("");
+      window.location.reload();
     } catch {
-      setError("Network error. Please try again.");
+      setError("Network error. Please retry.");
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="panel w-full max-w-md p-7 sm:p-9">
+    <div className="panel max-w-xl p-7 sm:p-9">
       <span className="grid size-12 place-items-center rounded-xl border border-cyan/30 bg-cyan/10 text-cyan">
-        <KeyRound className="size-5" />
+        <LockKeyhole className="size-5" />
       </span>
-      <h1 className="display mt-6 text-3xl">Owner sign-in</h1>
-      <p className="mt-3 text-sm leading-relaxed text-muted">
-        Authentication is required. Public registration is not offered; only explicitly allowlisted accounts can manage resumes.
+      <h1 className="display mt-6 text-3xl sm:text-4xl">Owner sign-in</h1>
+      <p className="pretty mt-3 text-sm leading-relaxed text-muted">
+        This area is private. Enter the administrator password stored as a server-side secret to manage published résumé versions.
       </p>
 
-      <form onSubmit={submit} className="mt-7 space-y-4">
+      <form onSubmit={submit} className="mt-8 space-y-5">
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Email</span>
-          <input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} className="field mt-2" placeholder="owner@example.com" />
+          <span className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-dim">Admin password</span>
+          <div className="relative">
+            <KeyRound className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-dim" />
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+              minLength={1}
+              className="field pl-11"
+              placeholder="Enter password"
+              aria-label="Admin password"
+            />
+          </div>
         </label>
-        <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">Password</span>
-          <input type="password" autoComplete="current-password" required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} className="field mt-2" placeholder="••••••••" />
-        </label>
-        {error && <p role="alert" className="rounded-lg border border-red-400/25 bg-red-400/[0.07] p-3 text-xs text-red-200">{error}</p>}
-        <MagneticButton type="submit" variant="primary" disabled={loading} className="w-full">
-          {loading ? <Loader2 className="size-4 animate-spin" /> : null}
-          {loading ? "Signing in…" : "Sign in securely"}
+
+        {error && (
+          <p role="alert" className="rounded-lg border border-red-400/25 bg-red-400/[0.06] p-3 text-xs text-red-200">{error}</p>
+        )}
+
+        <MagneticButton type="submit" variant="primary" disabled={busy} className="w-full">
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <LockKeyhole className="size-4" />}
+          {busy ? "Signing in…" : "Unlock resume manager"}
         </MagneticButton>
       </form>
 
       <p className="mt-6 text-[11px] leading-relaxed text-dim">
-        Sessions use secure, SameSite cookies. Failed attempts are rate-limited.
+        The password is never shipped to the browser or committed to source. Sessions use an HttpOnly, SameSite cookie.
       </p>
-    </motion.div>
+    </div>
   );
 }

@@ -1,16 +1,23 @@
 # NITIN DHURVE — BEYOND THE CODE
 
-Portfolio 2.0: an animated, security-first Next.js portfolio with a Supabase-backed résumé manager.
+Portfolio 2.0: an animated, security-first Next.js portfolio with a Vercel Blob-backed résumé manager.
 
 ## Stack
 
-Next.js 16 (App Router) · React 19 · TypeScript (strict) · Tailwind CSS v4 · GSAP · Motion · Lenis · Lucide · Supabase Auth/Postgres/Storage · Vercel.
+Next.js 16 (App Router) · React 19 · TypeScript (strict) · Tailwind CSS v4 · GSAP · Motion · Lenis · Lucide · Vercel Blob · Vercel.
 
 ## Local development
 
 ```bash
 npm install
+cp .env.example .env.local   # fill in the two server secrets; Blob vars come from `vercel env pull`
 npm run dev
+```
+
+For a fully local résumé test, pull the project's development env vars:
+
+```bash
+vercel env pull .env.local
 ```
 
 Quality gates:
@@ -29,12 +36,12 @@ npm run build
 | `/about` | Profile, education, principles |
 | `/achievements` | Achievement hall with verification labels |
 | `/experience` | Filterable experience timeline |
-| `/projects` | Searchable/filterable archive of 66 projects |
+| `/projects` | Searchable/filterable archive of 54 curated projects |
 | `/projects/[slug]` | Individual case studies |
 | `/skills` | Skill groups by domain |
 | `/certifications` | Certificate gallery with source images |
 | `/journey` | Year-by-year narrative |
-| `/resume` | Public read-only résumé preview + stable download link |
+| `/resume` | Public read-only résumé preview + stable download link (light/dark) |
 | `/contact` | Professional profiles |
 | `/admin/resume` | Private owner-only résumé manager (never linked publicly) |
 
@@ -52,56 +59,54 @@ All site content lives in `src/data/*.ts`:
 
 **Content policy:** never add fabricated achievements, statistics, certificates or results. Where official evidence was not supplied, entries are labelled `Self-reported` or `Pending confirmation`. Unverified personal projects (Milestone+, BhaktiCount) are labelled and have no repository link. Security work is described as authorized, defensive research only.
 
-Certificate images in `public/images/certificates/` were converted from the owner's local documents. Images with untranscribed titles are labelled `title not yet confirmed`.
+Certificate images in `public/images/certificates/` were converted from the owner's local documents. Images with untranscribed titles are labelled `title not yet confirmed`. Entries whose exact title could not be confirmed and which were not actual certificates have been removed from the gallery.
 
-## Résumé management (Supabase)
+## Résumé management (Vercel Blob)
 
-Writes are **deny-by-default**. Without credentials and an explicit admin allowlist, `/admin/resume` shows a locked state and every write endpoint returns `503`. No insecure uploader is deployed.
+Writes are **deny-by-default**. Without Blob storage plus both server secrets, `/admin/resume` shows a locked state and every write endpoint returns `503`. No insecure uploader is deployed.
 
-### 1. Database
+### 1. Storage
 
-Run [`supabase/migrations/0001_resume_system.sql`](supabase/migrations/0001_resume_system.sql) in the Supabase SQL editor. It creates:
-
-- private `resumes` bucket (PDF only, 10 MB limit)
-- `resume_versions` with exactly one active row (partial unique index)
-- `resume_audit_log` and `resume_rate_limits`
-- server-only functions for atomic version creation, publish/restore, deletion and rate limiting
-
-RLS is enabled with **no anon/authenticated policies**. All access is through server-side route handlers using the service role key, which is never sent to the browser.
-
-### 2. Environment
-
-Copy `.env.example` to `.env.local` (or set the same variables in Vercel):
+A public Vercel Blob store is connected to the Vercel project:
 
 ```bash
-NEXT_PUBLIC_SITE_URL=https://your-production-url.vercel.app
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...              # server only
-RESUME_ADMIN_IDS=<supabase-auth-user-uuid>  # immutable UUID, deny by default
-# RESUME_ADMIN_EMAILS=owner@example.com     # optional fallback identity
+vercel storage create nitin-resume --type blob --access public
+vercel storage connect nitin-resume
 ```
 
-Create the admin user in Supabase Authentication (email + password), then put that user's **UUID** in `RESUME_ADMIN_IDS`.
+On Vercel this injects `BLOB_STORE_ID` and a rotating `VERCEL_OIDC_TOKEN`; `@vercel/blob` uses them automatically. The public base URL is also stored as `BLOB_PUBLIC_BASE_URL` so manifest reads are immediate and never depend on the eventually-consistent Blob list API. Never add `NEXT_PUBLIC_` to a Blob credential.
+
+### 2. Server secrets
+
+Set these in the Vercel project (Production, Preview and Development):
+
+```bash
+RESUME_ADMIN_PASSWORD=<strong random password>
+RESUME_SESSION_SECRET=<openssl rand -hex 32>
+NEXT_PUBLIC_SITE_URL=https://nitinstechfolio.vercel.app
+```
+
+The password is compared with a timing-safe digest; the session secret signs an HttpOnly, SameSite cookie. Neither value is ever committed or sent to the browser. A local copy of the generated credentials is kept at `/home/kali/portfolio/.resume-admin-credentials` (gitignored).
 
 ### 3. Publish flow
 
-1. Sign in at `/admin/resume`.
-2. Drag a PDF (≤ 10 MB) into the upload panel — it is validated client-side and again server-side (`%PDF-` magic bytes, MIME, size).
-3. Preview it locally before upload. The uploaded version is stored as a **draft**.
-4. Publish or restore a version from Version history. This atomically flips the active row.
-5. Deletion is only allowed for inactive versions and removes the private storage object.
+1. Sign in at `/admin/resume` with the admin password.
+2. Upload a PDF (≤ 10 MB) — the server checks MIME, size and the `%PDF-` magic bytes.
+3. The upload is stored under `resumes/<uuid>.pdf` as a **draft**; the active version is unchanged.
+4. Publish or restore a version from Version history. The manifest at `resume/manifest.json` is atomically updated, so no redeploy is needed.
+5. Inactive versions can be deleted; the active version is protected from deletion.
 
-The public link `/api/resume/download` always serves the active version; `?inline=1` serves it for the `/resume` iframe preview. Updating a résumé never requires a redeploy.
+The public link `/api/resume/download` always resolves to the active version (302 → Blob download URL). `?inline=1` serves it for the `/resume` iframe preview.
 
 ### Security details
 
-- Server-side `getUser()` on every sensitive endpoint; 401 unauthenticated, 403 non-admin.
-- Origin checks on all state-changing requests; SameSite auth cookies.
-- Database-backed rate limits for sign-in and admin mutations.
-- Randomized storage keys (`resumes/<uuid>.pdf`) and audit log entries for upload/publish/restore/delete.
-- No filesystem uploads; no hardcoded passwords; no service-role exposure.
-- `/admin/resume` is `robots: noindex` and absent from navigation and sitemap.
+- Signed-cookie session check on every sensitive endpoint; missing/invalid session returns `401`.
+- Origin checks on all state-changing requests; SameSite + HttpOnly cookies.
+- Rate limits for sign-in and admin mutations.
+- Randomized storage keys and an audit trail for upload/publish/restore/delete.
+- No filesystem uploads; no hardcoded passwords; no service-role key.
+- `/admin/resume` is `robots: noindex`, absent from navigation and sitemap.
+- Résumé viewer supports light/dark themes and is mobile responsive.
 
 ## Deployment
 
@@ -111,7 +116,7 @@ The repo is linked to Vercel. Production deployment:
 vercel --prod
 ```
 
-Set the environment variables in the Vercel project before deploying if résumé management is required. Without them, the public site is fully functional and writes stay safely disabled.
+The production domain is `https://nitinstechfolio.vercel.app`. Set the environment variables above before deploying if résumé management is required; otherwise the public site still works and writes stay safely disabled.
 
 ## Honesty notes
 

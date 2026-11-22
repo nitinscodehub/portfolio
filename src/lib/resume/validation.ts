@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_PDF_BYTES } from "@/lib/supabase/config";
+import { MAX_PDF_BYTES } from "./config";
 
 export const publishSchema = z.object({
   id: z.string().uuid(),
@@ -8,9 +8,8 @@ export const publishSchema = z.object({
 
 export type PublishInput = z.infer<typeof publishSchema>;
 
-export const SIGN_IN_SCHEMA = z.object({
-  email: z.string().trim().email().max(254),
-  password: z.string().min(8).max(200),
+export const signInSchema = z.object({
+  password: z.string().min(1).max(200),
 });
 
 export class PdfValidationError extends Error {

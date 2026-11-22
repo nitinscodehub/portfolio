@@ -1,21 +1,27 @@
 import "server-only";
 
-import { createSupabaseAdminClient } from "@/lib/supabase/server";
+type Bucket = { hits: number[] };
+const buckets = new Map<string, Bucket>();
 
-/**
- * Database-backed limiter so limits hold across serverless instances.
- * Fails closed: when the limiter cannot be evaluated, the request is refused.
- */
+/** Lightweight in-process limiter (defence in depth, not the sole access control). */
 export async function allowRequest(key: string, limit: number, windowSeconds: number) {
-  const admin = createSupabaseAdminClient();
-  if (!admin) return false;
+  const now = Date.now();
+  const windowMs = windowSeconds * 1000;
+  const bucket = buckets.get(key) ?? { hits: [] };
+  bucket.hits = bucket.hits.filter((time) => now - time < windowMs);
+  if (bucket.hits.length >= limit) {
+    buckets.set(key, bucket);
+    return false;
+  }
+  bucket.hits.push(now);
+  buckets.set(key, bucket);
 
-  const { data, error } = await admin.rpc("resume_rate_limit", {
-    p_key: key.slice(0, 120),
-    p_limit: limit,
-    p_window: windowSeconds,
-  });
-
-  if (error) return false;
-  return data === true;
+  if (buckets.size > 5000) {
+    for (const [entryKey, entry] of buckets) {
+      if (entry.hits.length === 0 || now - entry.hits[entry.hits.length - 1]! > windowMs) {
+        buckets.delete(entryKey);
+      }
+    }
+  }
+  return true;
 }

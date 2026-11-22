@@ -258,7 +258,7 @@ export default function ResumeAdmin({ initialVersions, userEmail }: { initialVer
           )}
 
           <p className="mt-5 text-[11px] leading-relaxed text-dim">
-            Files are validated server-side (PDF signature and size), stored under randomized keys in a private bucket, and never written to the deployment filesystem.
+            Files are validated server-side (PDF signature and size), stored under randomized keys in Vercel Blob, and never written to the deployment filesystem.
           </p>
         </motion.div>
 

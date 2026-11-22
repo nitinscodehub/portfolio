@@ -20,20 +20,8 @@ export async function POST(request: Request) {
     return apiError(400, "missing_file", "Attach a PDF in the 'file' field.");
   }
 
-  const result = await uploadResumePdf(file, guard.user.id);
+  const result = await uploadResumePdf(file);
   if (!result.ok) return apiError(result.status, "upload_failed", result.message);
 
-  return Response.json(
-    {
-      version: {
-        id: result.version.id,
-        version: result.version.version,
-        filename: result.version.original_filename,
-        fileSize: result.version.file_size,
-        isActive: result.version.is_active,
-        uploadedAt: result.version.uploaded_at,
-      },
-    },
-    { status: 201, headers: noStoreHeaders() },
-  );
+  return Response.json({ version: result.version }, { status: 201, headers: noStoreHeaders() });
 }

@@ -1,23 +1,21 @@
 import { apiError, noStoreHeaders } from "@/lib/http";
-import { downloadActiveResume } from "@/lib/resume/service";
+import { getActiveDownload } from "@/lib/resume/service";
 
 export const dynamic = "force-dynamic";
 
 /** Stable public URL. Always resolves to the currently published version. */
 export async function GET(request: Request) {
-  const file = await downloadActiveResume();
+  const file = await getActiveDownload();
   if (!file) {
     return apiError(404, "no_resume", "No resume has been published yet.");
   }
 
   const inline = new URL(request.url).searchParams.get("inline") === "1";
-  const safeName = file.filename.replace(/["\r\n]/g, "").replace(/[^\w.\- ]/g, "");
-  return new Response(new Uint8Array(file.bytes), {
+  return new Response(null, {
+    status: 302,
     headers: {
       ...noStoreHeaders(),
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${safeName}"`,
-      "Content-Length": String(file.size),
+      Location: inline ? file.url : file.downloadUrl,
       "X-Resume-Version": String(file.version),
     },
   });

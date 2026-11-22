@@ -168,26 +168,6 @@ export const certifications: Certification[] = [
     detail: "Certificate image on file; programme details pending confirmation.",
     verification: "title not yet confirmed",
   },
-  {
-    id: "certificate-iwant",
-    title: "Course Completion Certificate",
-    issuer: "Issuer shown on certificate",
-    year: "Unconfirmed",
-    kind: "course",
-    image: "/images/certificates/certificate-iwant.png",
-    detail: "Certificate image on file; exact title pending confirmation.",
-    verification: "title not yet confirmed",
-  },
-  {
-    id: "sasha",
-    title: "Training Certificate",
-    issuer: "Issuer shown on certificate",
-    year: "Unconfirmed",
-    kind: "training",
-    image: "/images/certificates/sasha.png",
-    detail: "Certificate image on file; exact title pending confirmation.",
-    verification: "title not yet confirmed",
-  },
 ];
 
 export const credentialKindLabels: Record<CredentialKind, string> = {

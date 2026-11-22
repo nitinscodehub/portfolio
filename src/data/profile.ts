@@ -42,14 +42,14 @@ export const profile = {
   ],
   verifiedStats: [
     { value: "93", label: "Public GitHub repositories", detail: "Counted via GitHub API, 22 Nov 2026" },
-    { value: "60+", label: "Original projects indexed", detail: "Catalogued in this portfolio" },
+    { value: "50+", label: "Original projects indexed", detail: "Catalogued in this portfolio" },
     { value: "8", label: "Experience entries", detail: "Roles, internships and leadership" },
-    { value: "17", label: "Certificates on file", detail: "Gallery with source documents" },
+    { value: "15", label: "Certificates on file", detail: "Gallery with source documents" },
   ],
 } as const;
 
 export const siteConfig = {
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://portfolio-tawny-one-91.vercel.app",
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://nitinstechfolio.vercel.app",
   name: profile.brand,
   description: profile.secondaryTagline,
   locale: "en_IN",
