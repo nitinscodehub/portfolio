@@ -2,6 +2,8 @@
 
 Portfolio 2.0: an animated, security-first Next.js portfolio with a Vercel Blob-backed résumé manager.
 
+**Live:** [https://nitinstechfolio.vercel.app](https://nitinstechfolio.vercel.app)
+
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript (strict) · Tailwind CSS v4 · GSAP · Motion · Lenis · Lucide · Vercel Blob · Vercel.
